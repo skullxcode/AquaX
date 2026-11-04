@@ -1,0 +1,294 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  PANCHAYAT_ADMIN
+  OPERATOR
+}
+
+enum AssetType {
+  PUMP
+  PIPELINE
+  VALVE
+  TANK
+  TREATMENT_PLANT
+  OTHER
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_MAINTENANCE
+  DAMAGED
+}
+
+enum MaintenanceStatus {
+  REPORTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum StockMovementType {
+  PURCHASE
+  CONSUMPTION
+  ADJUSTMENT
+}
+
+enum ConsumerStatus {
+  ACTIVE
+  INACTIVE
+  DISCONNECTED
+}
+
+enum BillStatus {
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  NET_BANKING
+  CREDIT_CARD
+  DEBIT_CARD
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+enum FinancialEntryType {
+  RECEIPT
+  EXPENSE
+}
+
+model Panchayat {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  district  String
+  state     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  villages   Village[]
+  schemes    Scheme[]
+  inventory  InventoryItem[]
+  consumers  Consumer[]
+  financials FinancialEntry[]
+  suppliers  Supplier[]
+}
+
+model User {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  role        UserRole @default(OPERATOR)
+  panchayatId String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  panchayat   Panchayat?          @relation(fields: [panchayatId], references: [id])
+  movements   StockMovement[]
+  maintenance MaintenanceRecord[]
+  financials  FinancialEntry[]
+}
+
+model Village {
+  id          String @id @default(uuid())
+  name        String
+  panchayatId String
+
+  panchayat Panchayat  @relation(fields: [panchayatId], references: [id])
+  schemes   Scheme[]
+  consumers Consumer[]
+
+  @@unique([name, panchayatId])
+}
+
+model Scheme {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  villageId   String
+  panchayatId String
+  createdAt   DateTime @default(now())
+
+  village   Village   @relation(fields: [villageId], references: [id])
+  panchayat Panchayat @relation(fields: [panchayatId], references: [id])
+  assets    Asset[]
+}
+
+model Asset {
+  id               String      @id @default(uuid())
+  name             String
+  type             AssetType
+  status           AssetStatus @default(ACTIVE)
+  description      String?
+  latitude         Float?
+  longitude        Float?
+  installationDate DateTime?
+  schemeId         String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  scheme      Scheme              @relation(fields: [schemeId], references: [id])
+  maintenance MaintenanceRecord[]
+}
+
+model MaintenanceRecord {
+  id           String            @id @default(uuid())
+  assetId      String
+  reportedById String
+  title        String
+  description  String?
+  status       MaintenanceStatus @default(REPORTED)
+  cost         Decimal           @default(0) @db.Decimal(12, 2)
+  reportedAt   DateTime          @default(now())
+  completedAt  DateTime?
+
+  asset      Asset @relation(fields: [assetId], references: [id])
+  reportedBy User  @relation(fields: [reportedById], references: [id])
+}
+
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String?
+  address     String?
+  panchayatId String
+  createdAt   DateTime @default(now())
+
+  panchayat Panchayat @relation(fields: [panchayatId], references: [id])
+  stockMovements StockMovement[]
+}
+
+model InventoryItem {
+  id           String   @id @default(uuid())
+  name         String
+  category     String
+  unit         String
+  quantity     Float    @default(0)
+  reorderLevel Float    @default(0)
+  unitCost     Decimal  @db.Decimal(12, 2)
+  panchayatId  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  panchayat Panchayat       @relation(fields: [panchayatId], references: [id])
+  movements StockMovement[]
+}
+
+model StockMovement {
+  id        String            @id @default(uuid())
+  itemId    String
+  userId    String
+  supplierId String?
+  type      StockMovementType
+  quantity  Float
+  unitCost  Decimal?          @db.Decimal(12, 2)
+  reference String?
+  notes     String?
+  createdAt DateTime          @default(now())
+
+  item     InventoryItem @relation(fields: [itemId], references: [id])
+  user     User          @relation(fields: [userId], references: [id])
+  supplier Supplier?     @relation(fields: [supplierId], references: [id])
+
+  @@index([itemId, createdAt])
+  @@index([supplierId])
+}
+
+model Consumer {
+  id             String         @id @default(uuid())
+  consumerNo     String
+  name           String
+  phone          String?
+  address        String?
+  connectionDate DateTime?
+  monthlyRate    Decimal        @default(0) @db.Decimal(12, 2)
+  status         ConsumerStatus @default(ACTIVE)
+  villageId      String
+  panchayatId    String
+  createdAt      DateTime       @default(now())
+
+  village   Village   @relation(fields: [villageId], references: [id])
+  panchayat Panchayat @relation(fields: [panchayatId], references: [id])
+  bills     Bill[]
+
+  @@unique([consumerNo, panchayatId])
+}
+
+model Bill {
+  id          String     @id @default(uuid())
+  consumerId  String
+  periodStart DateTime
+  periodEnd   DateTime
+  dueDate     DateTime
+  amount      Decimal    @db.Decimal(12, 2)
+  status      BillStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+
+  consumer Consumer  @relation(fields: [consumerId], references: [id])
+  payments Payment[]
+
+  @@unique([consumerId, periodStart, periodEnd])
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  billId    String
+  amount    Decimal       @db.Decimal(12, 2)
+  method    PaymentMethod
+  status    PaymentStatus @default(PENDING)
+  reference      String?
+  paidAt         DateTime?
+  reversedAt     DateTime?
+  reversedReason String?
+  createdAt      DateTime      @default(now())
+
+  bill Bill @relation(fields: [billId], references: [id])
+  financialEntry FinancialEntry?
+}
+
+model FinancialEntry {
+  id           String             @id @default(uuid())
+  panchayatId  String
+  recordedById String
+  type         FinancialEntryType
+  category     String
+  description  String?
+  amount       Decimal            @db.Decimal(12, 2)
+  source       String?
+  reversalOfId String?  @unique
+  paymentId    String?  @unique
+  date         DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  panchayat   Panchayat       @relation(fields: [panchayatId], references: [id])
+  recordedBy  User            @relation(fields: [recordedById], references: [id])
+  reversalOf  FinancialEntry? @relation("FinancialReversal", fields: [reversalOfId], references: [id])
+  reversedBy  FinancialEntry? @relation("FinancialReversal")
+  payment     Payment?        @relation(fields: [paymentId], references: [id])
+}
