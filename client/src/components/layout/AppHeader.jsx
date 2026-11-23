@@ -23,7 +23,7 @@ const pageTitles = {
   "/villages": "Village Management",
   "/schemes": "Scheme Management",
   "/suppliers": "Suppliers",
-  "/assets": "Asset Management",
+  "/asset-management": "Asset Management",
   "/inventory": "Inventory",
   "/maintenance": "Maintenance",
   "/consumers": "Consumers",

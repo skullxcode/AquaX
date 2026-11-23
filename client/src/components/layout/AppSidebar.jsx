@@ -39,7 +39,7 @@ const navigation = [
     items: [
       { title: "Villages", url: "/villages", icon: MapPin },
       { title: "Schemes", url: "/schemes", icon: Layers3 },
-      { title: "Asset Management", url: "/assets", icon: Map },
+      { title: "Asset Management", url: "/asset-management", icon: Map },
       { title: "Inventory", url: "/inventory", icon: Package },
       { title: "Suppliers", url: "/suppliers", icon: Truck },
       { title: "Maintenance", url: "/maintenance", icon: Wrench },
